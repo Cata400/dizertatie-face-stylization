@@ -58,12 +58,12 @@ if __name__ == '__main__':
     print(style_latent.shape, style_target.shape)
     
     # Load the generator
-    original_generator = Generator(1024, 512, 8, 2).to('cuda')
+    generator = Generator(1024, 512, 8, 2).to('cuda')
     stylegan_checkpoint = torch.load(os.path.join('..', 'Models', 'stylegan2_config.pt'))
-    original_generator.load_state_dict(stylegan_checkpoint['g_ema'], strict=False)
+    generator.load_state_dict(stylegan_checkpoint['g_ema'], strict=False)
 
     # Generator to be finetuned
-    generator = deepcopy(original_generator)
+    # generator = deepcopy(original_generator)
     
     # Load the discriminator
     discriminator = Discriminator(1024, 2).to('cuda')
@@ -101,6 +101,9 @@ if __name__ == '__main__':
         print("Epoch:", epoch, "Loss:", loss.item())
         
         
+    del discriminator
+    torch.cuda.empty_cache()
+    
     ### Step 4: Generate the output image
     print('Inverting input image...')
     input_aligned = align_face(os.path.join('..', 'Models', 'face_lendmarks.dat'), INPUT_IMAGE_PATH)
