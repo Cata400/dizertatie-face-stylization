@@ -1,47 +1,12 @@
 from matplotlib import pyplot as plt
 import torch
 import torch.nn.functional as F
-import os
-import cv2
 import dlib
 from PIL import Image
 import numpy as np
-import math
-import torchvision
 import scipy
 import scipy.ndimage
-import torchvision.transforms as transforms
-
-
-@torch.no_grad()
-def load_model(generator, model_file_path):
-    ckpt = torch.load(model_file_path, map_location=lambda storage, loc: storage)
-    generator.load_state_dict(ckpt["g_ema"], strict=False)
-    return generator.mean_latent(50000)
-
-
-# given a list of filenames, load the inverted style code
-@torch.no_grad()
-def load_source(files, generator, device='cuda'):
-    sources = []
-    
-    for file in files:
-        source = torch.load(f'./inversion_codes/{file}.pt')['latent'].to(device)
-
-        if source.size(0) != 1:
-            source = source.unsqueeze(0)
-
-        if source.ndim == 3:
-            source = generator.get_latent(source, truncation=1, is_latent=True)
-            source = list2style(source)
-            
-        sources.append(source)
-        
-    sources = torch.cat(sources, 0)
-    if type(sources) is not list:
-        sources = style2list(sources)
-        
-    return sources
+import gc
 
 
 def get_landmark(filepath, predictor):
@@ -147,3 +112,10 @@ def align_face(landmark_predictor_path, filepath, output_size=1024, transform_si
 
     # Return aligned image.
     return img
+
+
+def get_keys(d, name):
+    if 'state_dict' in d:
+        d = d['state_dict']
+    d_filt = {k[len(name) + 1:]: v for k, v in d.items() if k[:len(name)] == name}
+    return d_filt
