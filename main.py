@@ -1,22 +1,23 @@
 import os
-import time
-import pickle
+import datetime
 
 import numpy as np
 from PIL import Image
 from torchvision import transforms
+from torch.utils.tensorboard import SummaryWriter
 
 from invert_gan_utils import invert_image
 from general_utils import *
 
 from stylegan256.model import Generator, Discriminator
+from restyle.utils.common import tensor2im
 from copy import deepcopy
 
 
 if __name__ == '__main__':
     # Step 1 parameters
-    REFERENCE_IMAGE_NAME = 'Lenna'
-    REFERENCE_IMAGE_EXT = '.png'
+    REFERENCE_IMAGE_NAME = 'arcane_jinx'
+    REFERENCE_IMAGE_EXT = '.jpg'
     REFERENCE_IMAGE_PATH = os.path.join('..', 'Images', 'References', REFERENCE_IMAGE_NAME + REFERENCE_IMAGE_EXT)
     INVERT_MODEL_NAME = 'e4e'
     INVERT_GAN_PATH = os.path.join('..', 'Models', 'restyle_' + INVERT_MODEL_NAME + '.pt')
@@ -63,14 +64,14 @@ if __name__ == '__main__':
     # Load the generator
     generator = Generator(256, 512, 8, 2).to(device)
     stylegan_checkpoint = torch.load(os.path.join('..', 'Models', '550000.pt'))
-    generator.load_state_dict(stylegan_checkpoint['g'], strict=False)
+    generator.load_state_dict(stylegan_checkpoint['g_ema'], strict=False)
     
     # Load the discriminator
     discriminator = Discriminator(256, 2).to(device)
     discriminator.load_state_dict(stylegan_checkpoint['d'], strict=False)
     
     # Optimizer
-    generator_optimizer = torch.optim.Adam(generator.parameters(), lr=2e-3, betas=(0, 0.99))
+    generator_optimizer = torch.optim.Adam(generator.parameters(), lr=1e-3, betas=(0, 0.99))
     
     # Which layers to swap to generate a set of plausible real images
     if PRESERVE_COLOR:
@@ -82,26 +83,31 @@ if __name__ == '__main__':
     generator.train()
     discriminator.eval()
     ALPHA = 1 - ALPHA
+    writer = SummaryWriter(log_dir=os.path.join('..', 'Logs', OUTPUT_IMAGE_NAME + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     
     for epoch in range(EPOCHS):
         mean_latent_code = generator.get_latent(torch.randn((style_latent.shape[0], style_latent.shape[-1])).to(device)).unsqueeze(1).repeat(1, generator.n_latent, 1)
         input_latent = style_latent.clone()
         input_latent[:, id_swap] = ALPHA * style_latent[:, id_swap] + (1 - ALPHA) * mean_latent_code[:, id_swap]
-        input_latent = input_latent[:, :generator.n_latent, :]
+        # input_latent = input_latent[:, :generator.n_latent, :]
         
-        new_style_image = generator(input_latent.to(device), input_is_latent=True)[0].unsqueeze(0)
+        new_style_image = generator(input_latent.to(device), input_is_latent=True)
+        
+        new_style_pil = tensor2im(new_style_image.squeeze(0))
+        new_style_pil.save(os.path.join('..', 'misc', 'new_style_image_' + str(epoch) + '.png'))
         
         with torch.no_grad():
             real_features = discriminator(style_target)
         fake_features = discriminator(new_style_image)
         
-        loss = sum([F.l1_loss(a, b) for a, b in zip(real_features, fake_features)]) / len(real_features)
+        loss = sum([F.l1_loss(x, y) for x, y in zip(fake_features, real_features)]) / len(real_features)
         
         generator_optimizer.zero_grad()
         loss.backward()
         generator_optimizer.step()
         
         print("Epoch ", epoch, "Loss:", loss.item())
+        writer.add_scalar('Loss', loss.item(), epoch)
         
     del discriminator
     torch.cuda.empty_cache()
@@ -110,23 +116,18 @@ if __name__ == '__main__':
     print('Inverting input image...')
     input_aligned = align_face(os.path.join('..', 'Models', 'face_lendmarks.dat'), INPUT_IMAGE_PATH)
     
-    input_target, input_latent = invert_image(input_aligned, INVERT_GAN_PATH, reps=1)
+    input_target, input_latent = invert_image(input_aligned, INVERT_GAN_PATH, reps=5)
     
     input_target.save(os.path.join('..', 'Images', 'Inverted', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_' + INPUT_IMAGE_EXT))
     np.save(os.path.join('..', 'Images', 'Inverted latents', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_latent_code.npy'), input_latent)
     
     input_latent = torch.from_numpy(input_latent).unsqueeze(0).to(device)
+    # input_latent = input_latent[:, :generator.n_latent, :]
 
     generator.eval()
     with torch.no_grad():
-        new_style_image = generator(input_latent.cuda(), input_is_latent=True)
-        
-    new_style_image = new_style_image.cpu()
-    new_style_image = 1 + new_style_image
-    new_style_image /= 2
+        new_style_image = generator(input_latent, input_is_latent=True)
     
-    new_style_image = new_style_image[0]
-    new_style_image = 255 * torch.clip(new_style_image, 0, 1)
-    new_style_image = new_style_image.permute(1, 2, 0).numpy()
-    new_style_image = Image.fromarray(new_style_image, mode='RGB')
+    new_style_image = tensor2im(new_style_image.squeeze(0))
+    new_style_image = new_style_image.resize((input_target.width, input_target.height))
     new_style_image.save(OUTPUT_IMAGE_PATH)
