@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from invert_gan_utils import invert_image
 from general_utils import *
 
-from stylegan256.model import Generator, Discriminator
+from stylegan.model import Generator, Discriminator
 from restyle.utils.common import tensor2im
 from copy import deepcopy
 
@@ -34,11 +34,11 @@ if __name__ == '__main__':
     INPUT_IMAGE_EXT = '.jpeg'
     INPUT_IMAGE_PATH = os.path.join('..', 'Images', 'Input', INPUT_IMAGE_NAME + INPUT_IMAGE_EXT)
 
-    OUTPUT_IMAGE_NAME = INPUT_IMAGE_NAME + '+' + REFERENCE_IMAGE_NAME
+    OUTPUT_IMAGE_NAME = INPUT_IMAGE_NAME + '+' + REFERENCE_IMAGE_NAME + '_ALPHA=' + str(ALPHA) + '_PC=' + str(PRESERVE_COLOR)
     OUTPUT_IMAGE_PATH = os.path.join('..', 'Images', 'Output', OUTPUT_IMAGE_NAME + INPUT_IMAGE_EXT)
     
     transform = transforms.Compose([
-                    transforms.Resize((256, 256)),
+                    transforms.Resize((1024, 1024)),
                     transforms.ToTensor(),
                     transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])]
                     )
@@ -62,13 +62,15 @@ if __name__ == '__main__':
     style_latent = torch.from_numpy(style_latent).unsqueeze(0).to(device)
         
     # Load the generator
-    generator = Generator(256, 512, 8, 2).to(device)
-    stylegan_checkpoint = torch.load(os.path.join('..', 'Models', '550000.pt'))
-    generator.load_state_dict(stylegan_checkpoint['g_ema'], strict=False)
+    generator = Generator(1024, 512, 8, 2).to(device)
+    # stylegan_checkpoint = torch.load(os.path.join('..', 'Models', '550000.pt'))
+    # generator.load_state_dict(stylegan_checkpoint['g_ema'], strict=False)
+    stylegan_checkpoint = torch.load(INVERT_GAN_PATH)
+    generator.load_state_dict(get_keys(stylegan_checkpoint, 'decoder'), strict=False)
     
     # Load the discriminator
-    discriminator = Discriminator(256, 2).to(device)
-    discriminator.load_state_dict(stylegan_checkpoint['d'], strict=False)
+    discriminator = Discriminator(1024, 2).to(device)
+    discriminator.load_state_dict(stylegan_checkpoint['discriminator_state_dict'], strict=False)
     
     # Optimizer
     generator_optimizer = torch.optim.Adam(generator.parameters(), lr=1e-3, betas=(0, 0.99))
@@ -93,8 +95,9 @@ if __name__ == '__main__':
         
         new_style_image = generator(input_latent.to(device), input_is_latent=True)
         
-        new_style_pil = tensor2im(new_style_image.squeeze(0))
-        new_style_pil.save(os.path.join('..', 'misc', 'new_style_image_' + str(epoch) + '.png'))
+        if epoch % 10 == 0:
+            new_style_pil = tensor2im(new_style_image.squeeze(0))
+            new_style_pil.save(os.path.join('..', 'misc', 'new_style_image_' + str(epoch) + '.png'))
         
         with torch.no_grad():
             real_features = discriminator(style_target)

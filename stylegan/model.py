@@ -8,13 +8,13 @@ from torch import nn
 from torch.nn import functional as F
 from torch.autograd import Function
 
-from stylegan256.op import conv2d_gradfix
+from stylegan.op import conv2d_gradfix
 if torch.cuda.is_available():
-    from stylegan256.op.fused_act import FusedLeakyReLU, fused_leaky_relu
-    from stylegan256.op.upfirdn2d import upfirdn2d
+    from stylegan.op.fused_act import FusedLeakyReLU, fused_leaky_relu
+    from stylegan.op.upfirdn2d import upfirdn2d
 else:
-    from stylegan256.op.fused_act_cpu import FusedLeakyReLU, fused_leaky_relu
-    from stylegan256.op.upfirdn2d_cpu import upfirdn2d
+    from stylegan.op.fused_act_cpu import FusedLeakyReLU, fused_leaky_relu
+    from stylegan.op.upfirdn2d_cpu import upfirdn2d
 
 
 class PixelNorm(nn.Module):

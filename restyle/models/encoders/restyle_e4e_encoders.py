@@ -47,8 +47,8 @@ class ProgressiveBackboneEncoder(Module):
             unit_module = bottleneck_IR_SE
 
         self.input_layer = Sequential(Conv2d(opts.input_nc, 64, (3, 3), 1, 1, bias=False),
-                                      BatchNorm2d(64),
-                                      PReLU(64))
+                                    BatchNorm2d(64),
+                                    PReLU(64))
         modules = []
         for block in blocks:
             for bottleneck in block:
