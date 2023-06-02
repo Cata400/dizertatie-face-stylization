@@ -61,16 +61,23 @@ if __name__ == '__main__':
     
     style_latent = torch.from_numpy(style_latent).unsqueeze(0).to(device)
         
+    # # Load the generator
+    # generator = Generator(1024, 512, 8, 2).to(device)
+    # stylegan_checkpoint = torch.load(INVERT_GAN_PATH)
+    # generator.load_state_dict(get_keys(stylegan_checkpoint, 'decoder'), strict=False)
+    
+    # # Load the discriminator
+    # discriminator = Discriminator(1024, 2).to(device)
+    # discriminator.load_state_dict(stylegan_checkpoint['discriminator_state_dict'], strict=False)
+    
     # Load the generator
     generator = Generator(1024, 512, 8, 2).to(device)
-    # stylegan_checkpoint = torch.load(os.path.join('..', 'Models', '550000.pt'))
-    # generator.load_state_dict(stylegan_checkpoint['g_ema'], strict=False)
-    stylegan_checkpoint = torch.load(INVERT_GAN_PATH)
-    generator.load_state_dict(get_keys(stylegan_checkpoint, 'decoder'), strict=False)
+    stylegan_checkpoint = torch.load(os.path.join('..', 'Models', 'stylegan2_config.pt'))
+    generator.load_state_dict(stylegan_checkpoint['g_ema'], strict=False)
     
     # Load the discriminator
     discriminator = Discriminator(1024, 2).to(device)
-    discriminator.load_state_dict(stylegan_checkpoint['discriminator_state_dict'], strict=False)
+    discriminator.load_state_dict(stylegan_checkpoint['d'], strict=False)
     
     # Optimizer
     generator_optimizer = torch.optim.Adam(generator.parameters(), lr=1e-3, betas=(0, 0.99))
@@ -91,13 +98,12 @@ if __name__ == '__main__':
         mean_latent_code = generator.get_latent(torch.randn((style_latent.shape[0], style_latent.shape[-1])).to(device)).unsqueeze(1).repeat(1, generator.n_latent, 1)
         input_latent = style_latent.clone()
         input_latent[:, id_swap] = ALPHA * style_latent[:, id_swap] + (1 - ALPHA) * mean_latent_code[:, id_swap]
-        # input_latent = input_latent[:, :generator.n_latent, :]
         
         new_style_image = generator(input_latent.to(device), input_is_latent=True)
         
         if epoch % 10 == 0:
             new_style_pil = tensor2im(new_style_image.squeeze(0))
-            new_style_pil.save(os.path.join('..', 'misc', 'new_style_image_' + str(epoch) + '.png'))
+            new_style_pil.save(os.path.join('..', 'Images', 'Training Set', REFERENCE_IMAGE_NAME + '_ALPHA=' + str(ALPHA) + '_PC=' + str(PRESERVE_COLOR) + '_' + str(epoch) + '.jpg'))
         
         with torch.no_grad():
             real_features = discriminator(style_target)
@@ -125,7 +131,6 @@ if __name__ == '__main__':
     np.save(os.path.join('..', 'Images', 'Inverted latents', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_latent_code.npy'), input_latent)
     
     input_latent = torch.from_numpy(input_latent).unsqueeze(0).to(device)
-    # input_latent = input_latent[:, :generator.n_latent, :]
 
     generator.eval()
     with torch.no_grad():
