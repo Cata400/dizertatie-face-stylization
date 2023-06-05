@@ -13,25 +13,28 @@ from stylegan.model import Generator, Discriminator
 from restyle.utils.common import tensor2im
 from copy import deepcopy
 
+from restyle2.e4e_projection import invert_image as invert_image2
+
 
 if __name__ == '__main__':
     # Step 1 parameters
-    REFERENCE_IMAGE_NAME = 'arcane_jinx'
-    REFERENCE_IMAGE_EXT = '.jpg'
+    REFERENCE_IMAGE_NAME = 'sketch3'
+    REFERENCE_IMAGE_EXT = '.jpeg'
     REFERENCE_IMAGE_PATH = os.path.join('..', 'Images', 'References', REFERENCE_IMAGE_NAME + REFERENCE_IMAGE_EXT)
     INVERT_MODEL_NAME = 'e4e'
-    INVERT_GAN_PATH = os.path.join('..', 'Models', 'restyle_' + INVERT_MODEL_NAME + '.pt')
+    INVERT_GAN_PATH = os.path.join('..', 'Models', INVERT_MODEL_NAME + '_ffhq_encode.pt')
+    # INVERT_GAN_PATH = os.path.join('..', 'Models', 'restyle_' + INVERT_MODEL_NAME + '_2.pt')
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     
     # Step 2 parameters
     REFERENCE_IMAGE_TRAINING_SET_PATH = os.path.join('..', 'Images', 'Training set', REFERENCE_IMAGE_NAME)
-    ALPHA = 0.5 # Strength of the finetuned style
+    ALPHA = 1 # Strength of the finetuned style
     PRESERVE_COLOR = False # Whether to preserve the color of the reference image
     EPOCHS = 300
     
     # Step 4 parameters
-    INPUT_IMAGE_NAME = 'Cata'
-    INPUT_IMAGE_EXT = '.jpeg'
+    INPUT_IMAGE_NAME = 'michael_b_jordan'
+    INPUT_IMAGE_EXT = '.jpg'
     INPUT_IMAGE_PATH = os.path.join('..', 'Images', 'Input', INPUT_IMAGE_NAME + INPUT_IMAGE_EXT)
 
     OUTPUT_IMAGE_NAME = INPUT_IMAGE_NAME + '+' + REFERENCE_IMAGE_NAME + '_ALPHA=' + str(ALPHA) + '_PC=' + str(PRESERVE_COLOR)
@@ -47,12 +50,19 @@ if __name__ == '__main__':
     torch.cuda.empty_cache()
 
     print('Inverting reference image...')
-    reference_aligned = align_face(os.path.join('..', 'Models', 'face_lendmarks.dat'), REFERENCE_IMAGE_PATH)
-    
-    style_target, style_latent = invert_image(reference_aligned, INVERT_GAN_PATH, reps=1)
+    try:
+        reference_aligned = align_face(os.path.join('..', 'Models', 'face_lendmarks.dat'), REFERENCE_IMAGE_PATH)
+    except AssertionError:
+        print('Reference image is not a face. Skipping alignment.')
+        reference_aligned = Image.open(REFERENCE_IMAGE_PATH).resize((1024, 1024))
+    reference_aligned.save(os.path.join('..', 'Images', 'Aligned', REFERENCE_IMAGE_NAME + '_aligned' + REFERENCE_IMAGE_EXT))
+
+    # style_target, style_latent = invert_image(reference_aligned, INVERT_GAN_PATH, reps=1)
+    style_target, style_latent = invert_image2(reference_aligned, INVERT_GAN_PATH)
 
     style_target.save(os.path.join('..', 'Images', 'Inverted', REFERENCE_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_' + REFERENCE_IMAGE_EXT))
     np.save(os.path.join('..', 'Images', 'Inverted latents', REFERENCE_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_latent_code.npy'), style_latent)
+            
     
     ### Step 2: Create training set
     # Prepare the data
@@ -60,6 +70,9 @@ if __name__ == '__main__':
     style_target = style_target.unsqueeze(0).to(device)
     
     style_latent = torch.from_numpy(style_latent).unsqueeze(0).to(device)
+    
+    print(style_target.shape)
+    print(style_latent.shape)
         
     # # Load the generator
     # generator = Generator(1024, 512, 8, 2).to(device)
@@ -72,7 +85,8 @@ if __name__ == '__main__':
     
     # Load the generator
     generator = Generator(1024, 512, 8, 2).to(device)
-    stylegan_checkpoint = torch.load(os.path.join('..', 'Models', 'stylegan2_config.pt'))
+    # stylegan_checkpoint = torch.load(os.path.join('..', 'Models', 'stylegan2_config.pt'))
+    stylegan_checkpoint = torch.load(os.path.join('..', 'Models', 'stylegan2-ffhq-config-f.pt'))
     generator.load_state_dict(stylegan_checkpoint['g_ema'], strict=False)
     
     # Load the discriminator
@@ -109,6 +123,7 @@ if __name__ == '__main__':
             real_features = discriminator(style_target)
         fake_features = discriminator(new_style_image)
         
+        
         loss = sum([F.l1_loss(x, y) for x, y in zip(fake_features, real_features)]) / len(real_features)
         
         generator_optimizer.zero_grad()
@@ -124,8 +139,10 @@ if __name__ == '__main__':
     ### Step 4: Generate the output image
     print('Inverting input image...')
     input_aligned = align_face(os.path.join('..', 'Models', 'face_lendmarks.dat'), INPUT_IMAGE_PATH)
+    input_aligned.save(os.path.join('..', 'Images', 'Aligned', INPUT_IMAGE_NAME + '_aligned' + INPUT_IMAGE_EXT))
     
-    input_target, input_latent = invert_image(input_aligned, INVERT_GAN_PATH, reps=5)
+    # input_target, input_latent = invert_image(input_aligned, INVERT_GAN_PATH, reps=5)
+    input_target, input_latent = invert_image2(input_aligned, INVERT_GAN_PATH)
     
     input_target.save(os.path.join('..', 'Images', 'Inverted', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_' + INPUT_IMAGE_EXT))
     np.save(os.path.join('..', 'Images', 'Inverted latents', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_latent_code.npy'), input_latent)
@@ -135,7 +152,11 @@ if __name__ == '__main__':
     generator.eval()
     with torch.no_grad():
         new_style_image = generator(input_latent, input_is_latent=True)
+    print(new_style_image.shape)
     
     new_style_image = tensor2im(new_style_image.squeeze(0))
     new_style_image = new_style_image.resize((input_target.width, input_target.height))
     new_style_image.save(OUTPUT_IMAGE_PATH)
+    
+    del generator
+    torch.cuda.empty_cache()

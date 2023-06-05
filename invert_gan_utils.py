@@ -25,8 +25,9 @@ def invert_image(image, invert_gan_path, reps):
     invert_gan_opts['batch_size'] = 1
     invert_gan_opts['test_batch_size'] = 1
     invert_gan_opts['n_iters_per_batch'] = reps
+    invert_gan_opts['output_size'] = 1024
     invert_gan_opts = Namespace(**invert_gan_opts)
-        
+            
     # Load Invert GAN model
     if invert_gan_opts.encoder_type in ENCODER_TYPES['e4e']:
         invert_gan = e4e(invert_gan_opts)

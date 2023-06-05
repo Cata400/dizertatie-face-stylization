@@ -53,8 +53,8 @@ class ProgressiveBackboneEncoder(Module):
         for block in blocks:
             for bottleneck in block:
                 modules.append(unit_module(bottleneck.in_channel,
-                                           bottleneck.depth,
-                                           bottleneck.stride))
+                                        bottleneck.depth,
+                                        bottleneck.stride))
         self.body = Sequential(*modules)
 
         self.styles = nn.ModuleList()
