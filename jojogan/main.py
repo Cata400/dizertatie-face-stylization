@@ -15,12 +15,14 @@ from copy import deepcopy
 
 from restyle2.e4e_projection import invert_image as invert_image2
 
+import time
+
 
 if __name__ == '__main__':
     # Step 1 parameters
-    REFERENCE_IMAGE_NAME = 'sketch3'
-    REFERENCE_IMAGE_EXT = '.jpeg'
-    REFERENCE_IMAGE_PATH = os.path.join('..', '..', 'Images', 'References', REFERENCE_IMAGE_NAME + REFERENCE_IMAGE_EXT)
+    REFERENCE_IMAGE_NAME = 'arcane_jinx'
+    REFERENCE_IMAGE_EXT = '.png'
+    REFERENCE_IMAGE_PATH = os.path.join('..', '..', 'Images', 'JojoGAN', 'Aligned', 'style', REFERENCE_IMAGE_NAME + REFERENCE_IMAGE_EXT)
     INVERT_MODEL_NAME = 'e4e'
     INVERT_GAN_PATH = os.path.join('..', '..', 'Models', INVERT_MODEL_NAME + '_ffhq_encode.pt')
     # INVERT_GAN_PATH = os.path.join('..', 'Models', 'restyle_' + INVERT_MODEL_NAME + '_2.pt')
@@ -33,12 +35,12 @@ if __name__ == '__main__':
     EPOCHS = 300
     
     # Step 4 parameters
-    INPUT_IMAGE_NAME = 'michael_b_jordan'
+    INPUT_IMAGE_NAME = 'arnold_aligned'
     INPUT_IMAGE_EXT = '.jpg'
-    INPUT_IMAGE_PATH = os.path.join('..', '..', 'Images', 'Input', INPUT_IMAGE_NAME + INPUT_IMAGE_EXT)
+    INPUT_IMAGE_PATH = os.path.join('..', '..', 'Images', 'JojoGAN', 'Aligned', 'content', INPUT_IMAGE_NAME + INPUT_IMAGE_EXT)
 
     OUTPUT_IMAGE_NAME = INPUT_IMAGE_NAME + '+' + REFERENCE_IMAGE_NAME + '_ALPHA=' + str(ALPHA) + '_PC=' + str(PRESERVE_COLOR)
-    OUTPUT_IMAGE_PATH = os.path.join('..', '..', 'Images', 'Output', OUTPUT_IMAGE_NAME + INPUT_IMAGE_EXT)
+    OUTPUT_IMAGE_PATH = os.path.join('..', '..', 'Images', 'JojoGAN', 'Output', OUTPUT_IMAGE_NAME + INPUT_IMAGE_EXT)
     
     transform = transforms.Compose([
                     transforms.Resize((1024, 1024)),
@@ -46,6 +48,7 @@ if __name__ == '__main__':
                     transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])]
                     )
     
+    start = time.time()
     ### Step 1: GAN Invert
     torch.cuda.empty_cache()
 
@@ -55,14 +58,14 @@ if __name__ == '__main__':
     except AssertionError:
         print('Reference image is not a face. Skipping alignment.')
         reference_aligned = Image.open(REFERENCE_IMAGE_PATH).resize((1024, 1024))
-    reference_aligned.save(os.path.join('..', '..', 'Images', 'Aligned', REFERENCE_IMAGE_NAME + '_aligned' + REFERENCE_IMAGE_EXT))
+    reference_aligned.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Aligned', REFERENCE_IMAGE_NAME + '_aligned' + REFERENCE_IMAGE_EXT))
     
 
     # style_target, style_latent = invert_image(reference_aligned, INVERT_GAN_PATH, reps=1)
     style_target, style_latent = invert_image2(reference_aligned, INVERT_GAN_PATH)
 
-    style_target.save(os.path.join('..', '..', 'Images', 'Inverted', REFERENCE_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_' + REFERENCE_IMAGE_EXT))
-    np.save(os.path.join('..', '..', 'Images', 'Inverted latents', REFERENCE_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_latent_code.npy'), style_latent)
+    style_target.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Inverted', REFERENCE_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_' + REFERENCE_IMAGE_EXT))
+    np.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Inverted latents', REFERENCE_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_latent_code.npy'), style_latent)
             
     
     ### Step 2: Create training set
@@ -74,15 +77,6 @@ if __name__ == '__main__':
     
     print(style_target.shape)
     print(style_latent.shape)
-        
-    # # Load the generator
-    # generator = Generator(1024, 512, 8, 2).to(device)
-    # stylegan_checkpoint = torch.load(INVERT_GAN_PATH)
-    # generator.load_state_dict(get_keys(stylegan_checkpoint, 'decoder'), strict=False)
-    
-    # # Load the discriminator
-    # discriminator = Discriminator(1024, 2).to(device)
-    # discriminator.load_state_dict(stylegan_checkpoint['discriminator_state_dict'], strict=False)
     
     # Load the generator
     generator = Generator(1024, 512, 8, 2).to(device)
@@ -107,7 +101,7 @@ if __name__ == '__main__':
     generator.train()
     discriminator.eval()
     ALPHA = 1 - ALPHA
-    writer = SummaryWriter(log_dir=os.path.join('..', 'Logs', OUTPUT_IMAGE_NAME + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+    writer = SummaryWriter(log_dir=os.path.join('..', '..', 'Logs', OUTPUT_IMAGE_NAME + '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     
     for epoch in range(EPOCHS):
         mean_latent_code = generator.get_latent(torch.randn((style_latent.shape[0], style_latent.shape[-1])).to(device)).unsqueeze(1).repeat(1, generator.n_latent, 1)
@@ -118,7 +112,7 @@ if __name__ == '__main__':
         
         if epoch % 10 == 0:
             new_style_pil = tensor2im(new_style_image.squeeze(0))
-            new_style_pil.save(os.path.join('..', '..', 'Images', 'Training Set', REFERENCE_IMAGE_NAME + '_ALPHA=' + str(ALPHA) + '_PC=' + str(PRESERVE_COLOR) + '_' + str(epoch) + '.jpg'))
+            new_style_pil.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Training Set', REFERENCE_IMAGE_NAME + '_ALPHA=' + str(ALPHA) + '_PC=' + str(PRESERVE_COLOR) + '_' + str(epoch) + '.jpg'))
         
         with torch.no_grad():
             real_features = discriminator(style_target)
@@ -131,7 +125,7 @@ if __name__ == '__main__':
         loss.backward()
         generator_optimizer.step()
         
-        print("Epoch ", epoch, "Loss:", loss.item())
+        # print("Epoch ", epoch, "Loss:", loss.item())
         writer.add_scalar('Loss', loss.item(), epoch)
         
     del discriminator
@@ -139,14 +133,17 @@ if __name__ == '__main__':
     
     ### Step 4: Generate the output image
     print('Inverting input image...')
-    input_aligned = align_face(os.path.join('..', '..', 'Models', 'face_lendmarks.dat'), INPUT_IMAGE_PATH)
-    input_aligned.save(os.path.join('..', '..', 'Images', 'Aligned', INPUT_IMAGE_NAME + '_aligned' + INPUT_IMAGE_EXT))
-    
+    try:
+        input_aligned = align_face(os.path.join('..', '..', 'Models', 'face_lendmarks.dat'), INPUT_IMAGE_PATH)
+    except AssertionError:
+        input_aligned = Image.open(INPUT_IMAGE_PATH).resize((1024, 1024))   
+        input_aligned.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Aligned', INPUT_IMAGE_NAME + '_aligned' + INPUT_IMAGE_EXT))
+
     # input_target, input_latent = invert_image(input_aligned, INVERT_GAN_PATH, reps=5)
     input_target, input_latent = invert_image2(input_aligned, INVERT_GAN_PATH)
     
-    input_target.save(os.path.join('..', '..', 'Images', 'Inverted', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_' + INPUT_IMAGE_EXT))
-    np.save(os.path.join('..', '..', 'Images', 'Inverted latents', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_latent_code.npy'), input_latent)
+    input_target.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Inverted', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_' + INPUT_IMAGE_EXT))
+    np.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Inverted latents', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_latent_code.npy'), input_latent)
     
     input_latent = torch.from_numpy(input_latent).unsqueeze(0).to(device)
 
@@ -161,3 +158,5 @@ if __name__ == '__main__':
     
     del generator
     torch.cuda.empty_cache()
+    end = time.time()
+    print(f'Time: {end - start:.2f} seconds')

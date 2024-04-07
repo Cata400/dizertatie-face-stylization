@@ -26,7 +26,7 @@ if __name__ == '__main__':
     save_dir = "./saved"   # output directory
     content_dir = "./content"
     style_dir = "./style"
-    model_path = "./celeba_hq.ckpt"
+    model_path = "../../Models/celeba_hq.ckpt"
     
     h_gamma = 0.6
     dt_lambda = 0.9985      # 1.0 for out-of-domain style transfer.

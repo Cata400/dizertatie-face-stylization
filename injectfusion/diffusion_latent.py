@@ -250,17 +250,41 @@ class Asyrp(object):
             raise ValueError("content_dir is not a valid directory")
         if not os.path.isdir(self.args.style_dir):
             raise ValueError("style_dir is not a valid directory")
+        
+        
+        if os.path.isfile(self.args.content_dir) and os.path.isfile(self.args.style_dir):
+            content_img_paths = [self.args.content_dir]
+            style_img_paths = [self.args.style_dir]
+        else:
+            # list all file path in self.args.content_dir
+            content_img_paths = [os.path.join(self.args.content_dir, f) for f in sorted(os.listdir(self.args.content_dir)) if os.path.isfile(os.path.join(self.args.content_dir, f)) and not os.path.isdir(os.path.join(self.args.content_dir, f))]
+            style_img_paths = [os.path.join(self.args.style_dir, f) for f in os.listdir(self.args.style_dir) if os.path.isfile(os.path.join(self.args.style_dir, f)) and not os.path.isdir(os.path.join(self.args.style_dir, f))]
 
-        # list all file path in self.args.content_dir
-        content_img_paths = [os.path.join(self.args.content_dir, f) for f in os.listdir(self.args.content_dir) if os.path.isfile(os.path.join(self.args.content_dir, f)) and not os.path.isdir(os.path.join(self.args.content_dir, f))]
-        style_img_paths = [os.path.join(self.args.style_dir, f) for f in os.listdir(self.args.style_dir) if os.path.isfile(os.path.join(self.args.style_dir, f)) and not os.path.isdir(os.path.join(self.args.style_dir, f))]
+            random.shuffle(style_img_paths)
+        
+            if len(content_img_paths) > len(style_img_paths):
+                style_img_paths = style_img_paths * (len(content_img_paths) // len(style_img_paths) + 1)
+            
+            style_img_paths = style_img_paths[:len(content_img_paths)]
+            
+            content_img_paths = content_img_paths[750:]
+            style_img_paths = style_img_paths[750:]
 
         # precompute content latent pairs
         for img_path in content_img_paths:
+            print(f"- Content inversion {img_path.split(os.path.sep)[-1]}")
+            start = time.time()
             content_lat_pairs.append(self.precompute_pairs_with_h(model, img_path))
+            end = time.time()
+            print(f"-- Time: {end - start:.2f} seconds")
+            
         # precompute style latent pairs
         for img_path in style_img_paths:
+            print(f"- Style inversion {img_path.split(os.path.sep)[-1]}")
+            start = time.time()
             style_lat_pairs.append(self.precompute_pairs_with_h(model, img_path))
+            end = time.time()
+            print(f"-- Time: {end - start:.2f} seconds")
 
         # ----------- Get seq -----------#    
         seq_inv = np.linspace(0, 1, self.args.n_inv_step) * self.args.t_0
@@ -296,8 +320,8 @@ class Asyrp(object):
         # ----------- Diff style ----------- #
 
 
-        results_list = [style_lat_pair[0].cpu() for style_lat_pair in style_lat_pairs]
-        results_list.insert(0,torch.zeros_like(results_list[0]))
+        # results_list = [style_lat_pair[0].cpu() for style_lat_pair in style_lat_pairs]
+        # results_list.insert(0,torch.zeros_like(results_list[0]))
 
 
         def take_closest(input_list, value):
@@ -306,106 +330,117 @@ class Asyrp(object):
 
         inv_timesteps = sorted(list(content_lat_pairs[0][3].keys()),reverse=True)
 
-        for content_i, content_lat_pair in enumerate(content_lat_pairs):
+        for i, (content_lat_pair, style_lat_pair) in enumerate(zip(content_lat_pairs, style_lat_pairs)):
             
-            results_list.append(content_lat_pair[0].cpu())
+            # results_list.append(content_lat_pair[0].cpu())
+            
+            print(f"{i + 1} / {len(content_lat_pairs)}")
+            start = time.time()
+            
+            style_i = i
 
-            for style_i, style_lat_pair in enumerate(style_lat_pairs):
-                content_path = content_img_paths[content_i]
-                style_path = style_img_paths[style_i]
+            content_path = content_img_paths[i]
+            style_path = style_img_paths[style_i]
 
-                save_path = 'content_' + content_path.split(os.path.sep)[-1].split('.')[0] + '_style_' + style_path.split(os.path.sep)[-1].split('.')[0] + '.png'
-                save_path = os.path.join(self.args.save_dir, save_path)
+            # save_path = 'content_' + content_path.split(os.path.sep)[-1].split('.')[0] + '_style_' + style_path.split(os.path.sep)[-1].split('.')[0] + '.png'
+            save_path = content_path.split(os.path.sep)[-1].split('.')[0] + "+" + style_path.split(os.path.sep)[-1].split('.')[0] + '.png'
+            save_path = os.path.join(self.args.save_dir, save_path)
 
-                
-                X_T = None
-                target_img_lat_pairs = []
+            
+            X_T = None
+            target_img_lat_pairs = []
 
-                x_origin = [style_lat_pair[0].to('cpu')]
-                X_T = [style_lat_pair[2].to(self.device)]
+            x_origin = [style_lat_pair[0].to('cpu')]
+            X_T = [style_lat_pair[2].to(self.device)]
 
-                target_img_lat_pairs = [content_lat_pair[3]]
-                target_img_x0_pairs = [content_lat_pair[0]]
+            target_img_lat_pairs = [content_lat_pair[3]]
+            target_img_x0_pairs = [content_lat_pair[0]]
 
 
-                X_T = torch.cat(X_T,dim=0)
-                x_origin = torch.cat(x_origin,dim=0)
-                target_img_x0_pairs = torch.cat(target_img_x0_pairs,dim=0)
+            X_T = torch.cat(X_T,dim=0)
+            x_origin = torch.cat(x_origin,dim=0)
+            target_img_x0_pairs = torch.cat(target_img_x0_pairs,dim=0)
 
-                x = X_T.clone().to(self.device)
-                noise_lat = X_T.clone().to(self.device)
+            x = X_T.clone().to(self.device)
+            noise_lat = X_T.clone().to(self.device)
 
-                xt_original = x
-                with tqdm(total=len(seq_train), desc="Inversion process with DiffStyle") as progress_bar:
-                    for t_it, (i,j) in enumerate(zip(reversed(seq_train), reversed(seq_train_next))):
-                        progress_bar.set_description(f"step_{t_it}")
+            xt_original = x
+            for t_it, (i,j) in enumerate(zip(reversed(seq_train), reversed(seq_train_next))):
+                # progress_bar.set_description(f"step_{t_it}")
 
-                        t = (torch.ones(X_T.shape[0]) * i).to(self.device)
-                        t_next = (torch.ones(X_T.shape[0]) * j).to(self.device)
+                t = (torch.ones(X_T.shape[0]) * i).to(self.device)
+                t_next = (torch.ones(X_T.shape[0]) * j).to(self.device)
 
-                        closest_t = take_closest(inv_timesteps, i)
+                closest_t = take_closest(inv_timesteps, i)
 
-                        delta_hs = []
-                        for target_img_lat_pair in target_img_lat_pairs:
-                            h_tmp = target_img_lat_pair[closest_t].to(self.device)
-                            delta_hs.append(h_tmp)
+                delta_hs = []
+                for target_img_lat_pair in target_img_lat_pairs:
+                    h_tmp = target_img_lat_pair[closest_t].to(self.device)
+                    delta_hs.append(h_tmp)
 
-                        delta_hs = torch.cat(delta_hs,dim=0)
-                        if i in seq_replace:
-                            x, _, coeff_before, xt_original = denoising_step(x, t=t, t_next=t_next, models=model,
-                                                                            logvars=self.logvar,
-                                                                            sampling_type=self.args.sample_type,
-                                                                            b=self.betas,
-                                                                            eta=0 if t[0].item()> self.args.t_noise else 1,#self.args.eta,
-                                                                            learn_sigma=self.learn_sigma,
-                                                                            index=0,
-                                                                            hs_coeff = [1 - self.args.hs_coeff],
-                                                                            delta_h=delta_hs,
-                                                                            use_mask=self.args.use_mask,
-                                                                            dt_lambda=self.args.dt_lambda,
-                                                                            dt_end = self.args.dt_end,
-                                                                            t_edit = self.args.user_defined_t_edit,
-                                                                            omega = self.args.omega,
-                                                                            )
-                        else:
-                            x, x0_t, _, _ = denoising_step(x, t=t, t_next=t_next, models=model,
-                                                        logvars=self.logvar,
-                                                        sampling_type=self.args.sample_type,
-                                                        b=self.betas,
-                                                        learn_sigma=self.learn_sigma)
-                            
-                        # if t_it % 91 == 0:
-                        #     resize_transform = transforms.Resize(1024)
-                        #     x_save = resize_transform((x.detach().cpu() + 1) * 0.5)
-                            
-                        #     tvu.save_image(x_save, f'./reverse/arnold_arcane_jinx{t_it}.png')
+                delta_hs = torch.cat(delta_hs,dim=0)
+                if i in seq_replace:
+                    x, _, coeff_before, xt_original = denoising_step(x, t=t, t_next=t_next, models=model,
+                                                                    logvars=self.logvar,
+                                                                    sampling_type=self.args.sample_type,
+                                                                    b=self.betas,
+                                                                    eta=0 if t[0].item()> self.args.t_noise else 1,#self.args.eta,
+                                                                    learn_sigma=self.learn_sigma,
+                                                                    index=0,
+                                                                    hs_coeff = [1 - self.args.hs_coeff],
+                                                                    delta_h=delta_hs,
+                                                                    use_mask=self.args.use_mask,
+                                                                    dt_lambda=self.args.dt_lambda,
+                                                                    dt_end = self.args.dt_end,
+                                                                    t_edit = self.args.user_defined_t_edit,
+                                                                    omega = self.args.omega,
+                                                                    )
+                else:
+                    x, x0_t, _, _ = denoising_step(x, t=t, t_next=t_next, models=model,
+                                                logvars=self.logvar,
+                                                sampling_type=self.args.sample_type,
+                                                b=self.betas,
+                                                learn_sigma=self.learn_sigma)
                         
-                        progress_bar.update(1)
+                    # if t_it % 91 == 0:
+                    #     resize_transform = transforms.Resize(1024)
+                    #     x_save = resize_transform((x.detach().cpu() + 1) * 0.5)
                         
-                        
-                # resize_transform = transforms.Resize(1024)
-                # x_save = resize_transform((x.detach().cpu() + 1) * 0.5)
-                # tvu.save_image(x_save, f'./reverse2/arnold_arcane_jinx{t_it}.png')
+                    #     tvu.save_image(x_save, f'./reverse/arnold_arcane_jinx{t_it}.png')
+                    
+                    # progress_bar.update(1)
+                    
+                    
+            # resize_transform = transforms.Resize(1024)
+            # x_save = resize_transform((x.detach().cpu() + 1) * 0.5)
+            # tvu.save_image(x_save, f'./reverse2/arnold_arcane_jinx{t_it}.png')
 
-                        
-                x_list = [x_origin, target_img_x0_pairs.detach().cpu(), x.detach().cpu()]
+                    
+            # x_list = [x_origin, target_img_x0_pairs.detach().cpu(), x.detach().cpu()]
+            x_list = [x.detach().cpu()]
 
-                x_list = torch.cat(x_list, dim=0)
-                x_list = (x_list + 1) * 0.5
-                
-                grid = tvu.make_grid(x_list, nrow=x_origin.shape[0], padding=1)
-                tvu.save_image(grid, save_path, normalize=False)
-                print(f"Image saved to {save_path}")
+            x_list = torch.cat(x_list, dim=0)
+            x_list = (x_list + 1) * 0.5
+            
+            grid = tvu.make_grid(x_list, nrow=x_origin.shape[0], padding=1)            
+            resize = transforms.Resize((1024, 1024))
+            grid = resize(grid)
+            
+            tvu.save_image(grid, save_path, normalize=False)
+            print(f"Image saved to {save_path}")
+            
+            end = time.time()
+            print(f"Time: {end - start:.2f} seconds")
 
-                results_list.append(x.detach().cpu())
+            # results_list.append(x.detach().cpu())
 
 
-        results_list = torch.cat(results_list, dim=0)
-        results_list = (results_list + 1) * 0.5
+        # results_list = torch.cat(results_list, dim=0)
+        # results_list = (results_list + 1) * 0.5
 
-        grid_total = tvu.make_grid(results_list, nrow=(len(style_img_paths)+1), padding=1)
-        tvu.save_image(grid_total, os.path.join(self.args.save_dir, 'grid.png'), normalize=False)
-        print("Grid saved to {}".format(os.path.join(self.args.save_dir, 'grid.png')))
+        # grid_total = tvu.make_grid(results_list, nrow=(len(style_img_paths)+1), padding=1)
+        # tvu.save_image(grid_total, os.path.join(self.args.save_dir, 'grid.png'), normalize=False)
+        # print("Grid saved to {}".format(os.path.join(self.args.save_dir, 'grid.png')))
 
         print("done")
 
@@ -458,25 +493,24 @@ class Asyrp(object):
             time_s = time.time()
 
             with torch.no_grad():
-                with tqdm(total=len(seq_inv), desc=f"Inversion processing") as progress_bar:
-                    for it, (i, j) in enumerate(zip((seq_inv_next[1:]), (seq_inv[1:]))):
-                        t = (torch.ones(n) * i).to(self.device)
-                        t_prev = (torch.ones(n) * j).to(self.device)
+                for it, (i, j) in enumerate(zip((seq_inv_next[1:]), (seq_inv[1:]))):
+                    t = (torch.ones(n) * i).to(self.device)
+                    t_prev = (torch.ones(n) * j).to(self.device)
 
-                        x, _, _, h = denoising_step(x, t=t, t_next=t_prev, models=model,
-                                            logvars=self.logvar,
-                                            sampling_type='ddim',
-                                            b=self.betas,
-                                            eta=0,
-                                            learn_sigma=self.learn_sigma,
-                                            )
-                        progress_bar.update(1)
-                        h_dic[i] = h.detach().clone().cpu()
-                        
-                #         if "style" in img_path and it % 91 == 0:
-                #             resize_transform = transforms.Resize(1024)
-                #             x_save = resize_transform((x.detach().cpu() + 1) * 0.5)
-                #             tvu.save_image(x_save, f'./forward/arnold_arcane_jinx{it}.png')
+                    x, _, _, h = denoising_step(x, t=t, t_next=t_prev, models=model,
+                                        logvars=self.logvar,
+                                        sampling_type='ddim',
+                                        b=self.betas,
+                                        eta=0,
+                                        learn_sigma=self.learn_sigma,
+                                        )
+                    # progress_bar.update(1)
+                    h_dic[i] = h.detach().clone().cpu()
+                    
+            #         if "style" in img_path and it % 91 == 0:
+            #             resize_transform = transforms.Resize(1024)
+            #             x_save = resize_transform((x.detach().cpu() + 1) * 0.5)
+            #             tvu.save_image(x_save, f'./forward/arnold_arcane_jinx{it}.png')
                             
                 # if "style" in img_path:
                 #     resize_transform = transforms.Resize(1024)
@@ -485,14 +519,14 @@ class Asyrp(object):
                                     
 
                 time_e = time.time()
-                progress_bar.set_description(f"Inversion processing time: {time_e - time_s:.2f}s")
+                # progress_bar.set_description(f"Inversion processing time: {time_e - time_s:.2f}s")
                 x_lat = x.clone()
             print("Generative process is skipped")
 
             img_lat_pairs = [x0, 0 , x_lat.detach().clone().cpu(), h_dic]
             
             torch.save(img_lat_pairs,save_path)
-            print("Precomputed pairs are saved to ", save_path)
+            # print("Precomputed pairs are saved to ", save_path)
 
             return img_lat_pairs
 
