@@ -32,9 +32,11 @@ diffusion:
     num_diffusion_timesteps: 1000
     projector:
         t_edit: 400
+        t_boost: 200
+        omega: 0.3
 
 training:
-    batch_size: 6 # 1 # 6
+    batch_size: 4 # 6
     n_epochs: 50 #10000
     n_iters: 5000000
     snapshot_freq: 5000 # 30000 # 5000
@@ -43,7 +45,7 @@ training:
 sampling:
     batch_size: 16 # 16
     last_only: True
-    # ckpt_id: 810000
+    # ckpt_id: 100000
 
 optim:
     weight_decay: 0.000

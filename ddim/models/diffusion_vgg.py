@@ -62,8 +62,7 @@ class ProjectorBlock(nn.Module):
                             kernel_size=1,
                             stride=1,
                             padding=0)
-
-
+        
     def forward(self, content_vgg, temb=None):
         h = content_vgg
 
@@ -80,6 +79,43 @@ class ProjectorBlock(nn.Module):
         h = self.conv3(h)
 
         return h
+    
+
+def slerp(t, v0, v1):
+    _shape = v0.shape
+
+    v0_origin = v0.clone()
+    v1_origin = v1.clone()
+
+    v0_copy = v0.view(_shape[0], -1)
+    v1_copy = v1.view(_shape[0], -1)
+
+    # Normalize the vectors to get the directions and angles
+    v0 = v0 / torch.norm(v0_copy, dim=1).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+    v1 = v1 / torch.norm(v1_copy, dim=1).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+
+    v0_copy = v0.view(_shape[0], -1)
+    v1_copy = v1.view(_shape[0], -1)
+
+    # Dot product with the normalized vectors (can't use np.dot in W)
+    dot = torch.sum(v0_copy * v1_copy, dim=1, keepdim=True).squeeze(-1)
+    # If absolute value of dot product is almost 1, vectors are ~colineal, so use lerp
+    # if torch.abs(dot) > 0.9995:
+    #     return lerp(t, v0, v1)
+    # Calculate initial angle between v0 and v1
+    theta_0 = torch.acos(dot)
+    sin_theta_0 = torch.sin(theta_0)
+    # Angle at timestep t
+    theta_t = theta_0 * t
+    sin_theta_t = torch.sin(theta_t)
+    # Finish the slerp algorithm
+    s0 = torch.sin(theta_0 - theta_t) / sin_theta_0
+    s1 = sin_theta_t / sin_theta_0
+    s0 = s0.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+    s1 = s1.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+    v2 = s0 * v0_origin + s1 * v1_origin
+    # v2 = v2.view(_shape)
+    return v2
 
 
 def get_timestep_embedding(timesteps, embedding_dim):
@@ -408,8 +444,18 @@ class DiffusionVGG(nn.Module):
         if content_vgg is not None: # and t[0] < self.config.diffusion.projector.t_edit:
             for i in range(1):
                 h_vgg = h_vgg + getattr(self, f"projector_{i}")(content_vgg, temb)
-                
-        h += h_vgg
+                        
+            h_copy = h.clone().view(h.shape[0], -1)
+            h_vgg_copy = h_vgg.clone().view(h.shape[0], -1)
+            
+            h_norm = torch.norm(h_copy, dim=1).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            h_vgg_norm = torch.norm(h_vgg_copy, dim=1).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            normalized_h_vgg = h_norm * h_vgg / h_vgg_norm
+            
+            h = slerp(0.6, h, normalized_h_vgg) # gamma = 0.6
+            
+        # h += h_vgg
+
         
         # upsampling
         for i_level in reversed(range(self.num_resolutions)):

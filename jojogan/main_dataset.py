@@ -40,15 +40,20 @@ if __name__ == '__main__':
     torch.random.manual_seed(seed)
     random.seed(seed)
     
-    input_dataset_path = os.path.join('..', '..', 'Datasets', 'ffhq1k')
+    input_dataset_path = os.path.join('..', '..', 'Datasets', 'ffhq1k_random_slice_0.1')
     input_image_files = sorted(os.listdir(input_dataset_path))
     
-    reference_dataset_path = os.path.join('..', '..', 'Datasets', 'sketches', 'sketches_all_resized')
+    # reference_dataset_path = os.path.join('..', '..', 'Datasets', 'sketches', 'sketches_all_resized')
+    reference_dataset_path = os.path.join('..', '..', 'Datasets', 'celeba_hq_lmdb', 'raw_images', 'test', 'images')
     reference_image_files = os.listdir(reference_dataset_path)
     random.shuffle(reference_image_files)
     reference_image_files = reference_image_files * 4
     
-    output_dataset_path = os.path.join('..', '..', 'Results', 'JojoGAN_ffhq_sketches_1k')
+    # output_dataset_path = os.path.join('..', '..', 'Results', 'JojoGAN_ffhq_sketches_1k_random_slice_0.3')
+    output_dataset_path = os.path.join('..', '..', 'Results', 'JojoGAN_ffhq_celeba_1k_random_slice_0.1')
+    
+    if not os.path.exists(output_dataset_path):
+        os.makedirs(output_dataset_path)
     
     # Load models
     stylegan_checkpoint = torch.load(os.path.join('..', '..', 'Models', 'stylegan2-ffhq-config-f.pt'))

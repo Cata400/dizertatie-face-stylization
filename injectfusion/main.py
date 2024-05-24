@@ -28,6 +28,11 @@ if __name__ == '__main__':
     style_dir = "./style"
     model_path = "../../Models/celeba_hq.ckpt"
     
+    content_dir = '/home/catalin/Desktop/Disertatie/dizertatie-face-stylization/injectfusion/test/content'
+    style_dir = '/home/catalin/Desktop/Disertatie/dizertatie-face-stylization/injectfusion/test/style'
+    save_dir = '/home/catalin/Desktop/Disertatie/Results/VGG_projector_test2'
+    
+    
     h_gamma = 0.6
     dt_lambda = 0.9985      # 1.0 for out-of-domain style transfer.
     t_boost = 200           # 0 for out-of-domain style transfer.

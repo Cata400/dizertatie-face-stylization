@@ -25,11 +25,13 @@ if __name__ == '__main__':
     gpu = 0
 
     config = "celeba.yml"     # Other option: afhq.yml celeba.yml metfaces.yml ffhq.yml lsun_bedroom.yml ...
-    save_dir = os.path.join('..', '..', 'Results', 'inject_fusion_ffhq_sketches_1k')  # output directory
-    content_dir = os.path.join('..', '..', 'Datasets', 'ffhq1k')
+    
+    save_dir = os.path.join('..', '..', 'Results', 'inject_fusion_ffhq_sketches_1k_random_slice_0.3')  # output directory
+    content_dir = os.path.join('..', '..', 'Datasets', 'ffhq1k_random_slice_0.3')
     style_dir = os.path.join('..', '..', 'Datasets', 'sketches', 'sketches_all_resized')
     
     
+        
     # save_dir = "./saved"   # output directory
     # content_dir = "./content"
     # style_dir = "./style"

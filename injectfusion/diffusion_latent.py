@@ -264,8 +264,11 @@ class Asyrp(object):
         
             if len(content_img_paths) > len(style_img_paths):
                 style_img_paths = style_img_paths * (len(content_img_paths) // len(style_img_paths) + 1)
-            
-            style_img_paths = style_img_paths[:len(content_img_paths)]
+                
+            if len(content_img_paths) == 1:
+                content_img_paths = content_img_paths * len(style_img_paths)
+            else:
+                style_img_paths = style_img_paths[:len(content_img_paths)]
             
             content_img_paths = content_img_paths[750:]
             style_img_paths = style_img_paths[750:]
@@ -524,7 +527,8 @@ class Asyrp(object):
             print("Generative process is skipped")
 
             img_lat_pairs = [x0, 0 , x_lat.detach().clone().cpu(), h_dic]
-            
+            print("Image latent pairs shape: ", len(img_lat_pairs), img_lat_pairs[0].shape, img_lat_pairs[2].shape, len(img_lat_pairs[3]), img_lat_pairs[3][0].shape) 
+
             torch.save(img_lat_pairs,save_path)
             # print("Precomputed pairs are saved to ", save_path)
 

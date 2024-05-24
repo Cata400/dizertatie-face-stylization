@@ -47,18 +47,6 @@ def parse_args_and_config():
         help="Whether to produce samples from the model",
     )
     
-    parser.add_argument(
-        "--train_projector",
-        action="store_true",
-        help="Whether to train the vgg projector",
-    )
-    
-    parser.add_argument(
-        "--sample_projector",
-        action="store_true",
-        help="Whether to produce samples using the vgg projector",
-    )
-    
     parser.add_argument("--fid", action="store_true")
     parser.add_argument("--interpolation", action="store_true")
     parser.add_argument(
@@ -99,6 +87,54 @@ def parse_args_and_config():
         help="eta used to control the variances of sigma",
     )
     parser.add_argument("--sequence", action="store_true")
+    
+    
+    ###### Projector ########  
+    parser.add_argument(
+        "--train_projector",
+        action="store_true",
+        help="Whether to train the vgg projector",
+    )
+    
+    parser.add_argument(
+        "--sample_projector",
+        action="store_true",
+        help="Whether to produce samples using the vgg projector",
+    )
+    
+    parser.add_argument(
+        "--diffstyle_vgg",
+        action="store_true",
+        help="Whether to use the diffstyle vgg projector for style transfer",
+    )
+    
+    parser.add_argument(
+        "--content",
+        type=str,
+        default="content path",
+    )
+    
+    parser.add_argument(
+        "--style",
+        type=str,
+        default="style path",
+    )
+    
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="output path",
+    )
+    
+    parser.add_argument(
+        "--ood",
+        action="store_true",
+        help="Out of domain style transfer",
+    )
+    
+    
+    ###### Projector ########  
+
 
     args = parser.parse_args()
     args.log_path = os.path.join(args.exp, "logs", args.doc)
@@ -110,89 +146,91 @@ def parse_args_and_config():
 
     tb_path = os.path.join(args.exp, "tensorboard", args.doc)
 
-    if not args.test and not (args.sample or args.sample_projector):
-        if not args.resume_training:
-            if os.path.exists(args.log_path):
-                overwrite = False
-                if args.ni:
-                    overwrite = True
-                else:
-                    response = input("Folder already exists. Overwrite? (Y/N)")
-                    if response.upper() == "Y":
-                        overwrite = True
 
-                if overwrite:
-                    shutil.rmtree(args.log_path)
-                    shutil.rmtree(tb_path)
-                    os.makedirs(args.log_path)
-                    if os.path.exists(tb_path):
-                        shutil.rmtree(tb_path)
-                else:
-                    print("Folder exists. Program halted.")
-                    sys.exit(0)
-            else:
-                os.makedirs(args.log_path)
-
-            with open(os.path.join(args.log_path, "config.yml"), "w") as f:
-                yaml.dump(new_config, f, default_flow_style=False)
-
-        new_config.tb_logger = tb.SummaryWriter(log_dir=tb_path)
-        # setup logger
-        level = getattr(logging, args.verbose.upper(), None)
-        if not isinstance(level, int):
-            raise ValueError("level {} not supported".format(args.verbose))
-
-        handler1 = logging.StreamHandler()
-        handler2 = logging.FileHandler(os.path.join(args.log_path, "stdout.txt"))
-        formatter = logging.Formatter(
-            "%(levelname)s - %(filename)s - %(asctime)s - %(message)s"
-        )
-        handler1.setFormatter(formatter)
-        handler2.setFormatter(formatter)
-        logger = logging.getLogger()
-        logger.addHandler(handler1)
-        logger.addHandler(handler2)
-        logger.setLevel(level)
-
-    else:
-        level = getattr(logging, args.verbose.upper(), None)
-        if not isinstance(level, int):
-            raise ValueError("level {} not supported".format(args.verbose))
-
-        handler1 = logging.StreamHandler()
-        formatter = logging.Formatter(
-            "%(levelname)s - %(filename)s - %(asctime)s - %(message)s"
-        )
-        handler1.setFormatter(formatter)
-        logger = logging.getLogger()
-        logger.addHandler(handler1)
-        logger.setLevel(level)
-
-        if args.sample or args.sample_projector:
-            os.makedirs(os.path.join(args.exp, "image_samples"), exist_ok=True)
-            args.image_folder = os.path.join(
-                args.exp, "image_samples", args.image_folder
-            )
-            if not os.path.exists(args.image_folder):
-                os.makedirs(args.image_folder)
-            else:
-                if not (args.fid or args.interpolation or args.sample_projector):
+    if not args.diffstyle_vgg:
+        if not args.test and not (args.sample or args.sample_projector):
+            if not args.resume_training:
+                if os.path.exists(args.log_path):
                     overwrite = False
                     if args.ni:
                         overwrite = True
                     else:
-                        response = input(
-                            f"Image folder {args.image_folder} already exists. Overwrite? (Y/N)"
-                        )
+                        response = input("Folder already exists. Overwrite? (Y/N)")
                         if response.upper() == "Y":
                             overwrite = True
 
                     if overwrite:
-                        shutil.rmtree(args.image_folder)
-                        os.makedirs(args.image_folder)
+                        shutil.rmtree(args.log_path)
+                        shutil.rmtree(tb_path)
+                        os.makedirs(args.log_path)
+                        if os.path.exists(tb_path):
+                            shutil.rmtree(tb_path)
                     else:
-                        print("Output image folder exists. Program halted.")
+                        print("Folder exists. Program halted.")
                         sys.exit(0)
+                else:
+                    os.makedirs(args.log_path)
+
+                with open(os.path.join(args.log_path, "config.yml"), "w") as f:
+                    yaml.dump(new_config, f, default_flow_style=False)
+
+            new_config.tb_logger = tb.SummaryWriter(log_dir=tb_path)
+            # setup logger
+            level = getattr(logging, args.verbose.upper(), None)
+            if not isinstance(level, int):
+                raise ValueError("level {} not supported".format(args.verbose))
+
+            handler1 = logging.StreamHandler()
+            handler2 = logging.FileHandler(os.path.join(args.log_path, "stdout.txt"))
+            formatter = logging.Formatter(
+                "%(levelname)s - %(filename)s - %(asctime)s - %(message)s"
+            )
+            handler1.setFormatter(formatter)
+            handler2.setFormatter(formatter)
+            logger = logging.getLogger()
+            logger.addHandler(handler1)
+            logger.addHandler(handler2)
+            logger.setLevel(level)
+
+        else:
+            level = getattr(logging, args.verbose.upper(), None)
+            if not isinstance(level, int):
+                raise ValueError("level {} not supported".format(args.verbose))
+
+            handler1 = logging.StreamHandler()
+            formatter = logging.Formatter(
+                "%(levelname)s - %(filename)s - %(asctime)s - %(message)s"
+            )
+            handler1.setFormatter(formatter)
+            logger = logging.getLogger()
+            logger.addHandler(handler1)
+            logger.setLevel(level)
+
+            if args.sample or args.sample_projector:
+                os.makedirs(os.path.join(args.exp, "image_samples"), exist_ok=True)
+                args.image_folder = os.path.join(
+                    args.exp, "image_samples", args.image_folder
+                )
+                if not os.path.exists(args.image_folder):
+                    os.makedirs(args.image_folder)
+                else:
+                    if not (args.fid or args.interpolation or args.sample_projector):
+                        overwrite = False
+                        if args.ni:
+                            overwrite = True
+                        else:
+                            response = input(
+                                f"Image folder {args.image_folder} already exists. Overwrite? (Y/N)"
+                            )
+                            if response.upper() == "Y":
+                                overwrite = True
+
+                        if overwrite:
+                            shutil.rmtree(args.image_folder)
+                            os.makedirs(args.image_folder)
+                        else:
+                            print("Output image folder exists. Program halted.")
+                            sys.exit(0)
 
     # add device
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -235,8 +273,12 @@ def main():
             runner.test()
         elif args.train_projector:
             runner.train_projector()
+            # runner.train_projector_lora()
         elif args.sample_projector:
             runner.sample_projector()
+            # runner.sample_projector_lora()
+        elif args.diffstyle_vgg:
+            runner.diffstyle_vgg()
         else:
             runner.train()
     except Exception:
