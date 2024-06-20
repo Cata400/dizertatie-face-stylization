@@ -270,8 +270,8 @@ class Asyrp(object):
             else:
                 style_img_paths = style_img_paths[:len(content_img_paths)]
             
-            content_img_paths = content_img_paths[750:]
-            style_img_paths = style_img_paths[750:]
+            # content_img_paths = content_img_paths[:250]
+            # style_img_paths = style_img_paths[:250]
 
         # precompute content latent pairs
         for img_path in content_img_paths:

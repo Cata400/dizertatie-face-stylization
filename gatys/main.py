@@ -28,8 +28,8 @@ def main(content_path, style_path, output_path):
     content_image = load_image(content_path)
     style_image = load_image(style_path)
     
-    content_weight = 1e3
-    style_weight = 1e-2
+    content_weight = 1e3    # alpha
+    style_weight = 1e-2     # beta
     epochs = 1000
 
     content_layers = ['block5_conv2'] 
@@ -52,8 +52,9 @@ def main(content_path, style_path, output_path):
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.02, beta_1=0.99, epsilon=1e-1)
 
     start = time.time()
-    for _ in range(epochs):
+    for i in range(epochs):
         train_step(image, extractor, optimizer, targets, content_weight, style_weight)
+        
     
     end = time.time()
     print("Total time: {:.1f}".format(end-start))
@@ -63,9 +64,12 @@ def main(content_path, style_path, output_path):
         
 
 if __name__ == '__main__':
-    # content_path =  os.path.join('..', '..', 'Images', 'Gatys', 'Content', "labrador.jpg")
-    # style_path =  os.path.join('..', '..', 'Images', 'Gatys', 'Style', "stary_night.jpg")
+    # content_path =  os.path.join('..', '..', 'Datasets', 'ffhq1k', '00098.png')
+    # style_path =  os.path.join('..', '..', 'Datasets', 'sketches', 'sketches_all_resized', 'img237.png')
+    # output_path = f"/home/catalin/Desktop/Disertatie/Results/Gatys/latex/0098+img237.png"
     
+    # main(content_path, style_path, output_path)
+        
     parser = argparse.ArgumentParser(description="Neural Style Tranfer")
     
     parser.add_argument('content', type=str, help='Content image path')
@@ -75,4 +79,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     main(args.content, args.style, args.output)
+    
+    
+
 

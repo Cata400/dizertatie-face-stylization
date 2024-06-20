@@ -19,7 +19,7 @@ class StyleContentModel(tf.keras.models.Model):
         inputs = inputs * 255.0
         preprocessed_input = tf.keras.applications.vgg19.preprocess_input(inputs)
         outputs = self.vgg(preprocessed_input)
-        
+                
         content_outputs, style_outputs = outputs[:self.num_content_layers], outputs[self.num_content_layers:]
 
         style_outputs = [self.gram_matrix(style_output) for style_output in style_outputs]

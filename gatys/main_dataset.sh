@@ -10,8 +10,10 @@
 
 # Parameters
 CONTENT_DIR=../../Datasets/ffhq1k_random_slice_0.3
-STYLE_DIR=../../Datasets/sketches/sketches_all_resized
-OUTPUT_DIR=../../Results/Gatys_ffhq_sketches_1k_random_slice_0.3
+# STYLE_DIR=../../Datasets/sketches/sketches_all_resized
+# STYLE_DIR=../../Datasets/celeba_hq_lmdb/raw_images/test/images
+STYLE_DIR=../../Datasets/aahq/aligned
+OUTPUT_DIR=../../Results/Gatys_ffhq_aahq_1k_random_slice_0.3
 RANDOM_SEED=42
 
 # Create the output directory

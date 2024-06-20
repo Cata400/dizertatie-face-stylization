@@ -6,28 +6,22 @@ from PIL import Image
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 
-from invert_gan_utils import invert_image
 from general_utils import *
 
 from stylegan.model import Generator, Discriminator
 from restyle.utils.common import tensor2im
-from copy import deepcopy
 
-from restyle2.e4e_projection import invert_image as invert_image2
+from restyle.e4e_projection import invert_image
 
 import random
 import time
 
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Agg')
 
 
 if __name__ == '__main__':
     # Step 1 parameters
     INVERT_MODEL_NAME = 'e4e'
     INVERT_GAN_PATH = os.path.join('..', '..', 'Models', INVERT_MODEL_NAME + '_ffhq_encode.pt')
-    # INVERT_GAN_PATH = os.path.join('..', 'Models', 'restyle_' + INVERT_MODEL_NAME + '_2.pt')
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     
     # Step 2 parameters
@@ -40,17 +34,17 @@ if __name__ == '__main__':
     torch.random.manual_seed(seed)
     random.seed(seed)
     
-    input_dataset_path = os.path.join('..', '..', 'Datasets', 'ffhq1k_random_slice_0.1')
+    input_dataset_path = os.path.join('..', '..', 'Datasets', 'ffhq1k_random_slice_0.3')
     input_image_files = sorted(os.listdir(input_dataset_path))
     
     # reference_dataset_path = os.path.join('..', '..', 'Datasets', 'sketches', 'sketches_all_resized')
-    reference_dataset_path = os.path.join('..', '..', 'Datasets', 'celeba_hq_lmdb', 'raw_images', 'test', 'images')
+    # reference_dataset_path = os.path.join('..', '..', 'Datasets', 'celeba_hq_lmdb', 'raw_images', 'test', 'images')
+    reference_dataset_path = os.path.join('..', '..', 'Datasets', 'aahq', 'aligned')
     reference_image_files = os.listdir(reference_dataset_path)
     random.shuffle(reference_image_files)
     reference_image_files = reference_image_files * 4
     
-    # output_dataset_path = os.path.join('..', '..', 'Results', 'JojoGAN_ffhq_sketches_1k_random_slice_0.3')
-    output_dataset_path = os.path.join('..', '..', 'Results', 'JojoGAN_ffhq_celeba_1k_random_slice_0.1')
+    output_dataset_path = os.path.join('..', '..', 'Results', 'JojoGAN_ffhq_aahq_1k_random_slice_0.3')
     
     if not os.path.exists(output_dataset_path):
         os.makedirs(output_dataset_path)
@@ -88,10 +82,8 @@ if __name__ == '__main__':
         except AssertionError:
             reference_aligned = Image.open(REFERENCE_IMAGE_PATH).resize((1024, 1024))    
 
-        style_target, style_latent = invert_image2(reference_aligned, INVERT_GAN_PATH)    
-        
-        # style_target.save(os.path.join(output_dataset_path, f'blabla_{i+1}.png'))
-        
+        style_target, style_latent = invert_image(reference_aligned, INVERT_GAN_PATH)    
+                
         ### Step 2: Create training set
         # Prepare the data
         style_target = transform(style_target)
@@ -104,9 +96,7 @@ if __name__ == '__main__':
         
         # Optimizer
         generator_optimizer = torch.optim.Adam(generator.parameters(), lr=1e-3, betas=(0, 0.99))
-        
-        # generator = torch.compile(generator)
-        
+                
         # Which layers to swap to generate a set of plausible real images
         if PRESERVE_COLOR:
             id_swap = [9, 11, 15, 16, 17]
@@ -146,7 +136,7 @@ if __name__ == '__main__':
         except AssertionError:
             input_aligned = Image.open(INPUT_IMAGE_PATH).resize((1024, 1024))   
         
-        input_target, input_latent = invert_image2(input_aligned, INVERT_GAN_PATH)    
+        input_target, input_latent = invert_image(input_aligned, INVERT_GAN_PATH)    
         input_latent = torch.from_numpy(input_latent).unsqueeze(0).to(device)
 
         generator.eval()

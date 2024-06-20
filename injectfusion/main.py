@@ -30,7 +30,7 @@ if __name__ == '__main__':
     
     content_dir = '/home/catalin/Desktop/Disertatie/dizertatie-face-stylization/injectfusion/test/content'
     style_dir = '/home/catalin/Desktop/Disertatie/dizertatie-face-stylization/injectfusion/test/style'
-    save_dir = '/home/catalin/Desktop/Disertatie/Results/VGG_projector_test2'
+    save_dir = '/home/catalin/Desktop/Disertatie/Results/VGG_projector_test3'
     
     
     h_gamma = 0.6

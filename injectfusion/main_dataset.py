@@ -26,12 +26,17 @@ if __name__ == '__main__':
 
     config = "celeba.yml"     # Other option: afhq.yml celeba.yml metfaces.yml ffhq.yml lsun_bedroom.yml ...
     
-    save_dir = os.path.join('..', '..', 'Results', 'inject_fusion_ffhq_sketches_1k_random_slice_0.3')  # output directory
+    save_dir = os.path.join('..', '..', 'Results', 'inject_fusion_ffhq_aahq_1k_random_slice_0.3')  # output directory
     content_dir = os.path.join('..', '..', 'Datasets', 'ffhq1k_random_slice_0.3')
-    style_dir = os.path.join('..', '..', 'Datasets', 'sketches', 'sketches_all_resized')
+    # style_dir = os.path.join('..', '..', 'Datasets', 'sketches', 'sketches_all_resized')
+    # style_dir = os.path.join('..', '..', 'Datasets', 'celeba_hq_lmdb', 'raw_images', 'test', 'images')
+    style_dir = os.path.join('..', '..', 'Datasets', 'aahq', 'aligned')
+    
+    # save_dir = 'test/test' # output directory
+    # content_dir = 'test/content'
+    # style_dir = 'test/style'
     
     
-        
     # save_dir = "./saved"   # output directory
     # content_dir = "./content"
     # style_dir = "./style"

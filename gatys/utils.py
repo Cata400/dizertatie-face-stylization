@@ -54,6 +54,17 @@ def style_content_loss(outputs, targets, content_weight, style_weight):
     return loss
 
 
+def style_loss(outputs, targets):
+    style_outputs = outputs['style']
+    style_targets = targets['style']
+    
+    style_loss = tf.add_n([tf.reduce_mean((style_outputs[name] - style_targets[name])**2) 
+                            for name in style_outputs.keys()])
+    style_loss *= 1 / len(style_outputs)
+    
+    return style_loss
+
+
 @tf.function()
 def train_step(image, extractor, optimizer, targets, content_weight, style_weight):
     with tf.GradientTape() as tape:

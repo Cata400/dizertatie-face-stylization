@@ -6,14 +6,12 @@ from PIL import Image
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 
-from invert_gan_utils import invert_image
 from general_utils import *
 
 from stylegan.model import Generator, Discriminator
 from restyle.utils.common import tensor2im
-from copy import deepcopy
 
-from restyle2.e4e_projection import invert_image as invert_image2
+from restyle.e4e_projection import invert_image
 
 import time
 
@@ -25,7 +23,6 @@ if __name__ == '__main__':
     REFERENCE_IMAGE_PATH = os.path.join('..', '..', 'Images', 'JojoGAN', 'Aligned', 'style', REFERENCE_IMAGE_NAME + REFERENCE_IMAGE_EXT)
     INVERT_MODEL_NAME = 'e4e'
     INVERT_GAN_PATH = os.path.join('..', '..', 'Models', INVERT_MODEL_NAME + '_ffhq_encode.pt')
-    # INVERT_GAN_PATH = os.path.join('..', 'Models', 'restyle_' + INVERT_MODEL_NAME + '_2.pt')
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     
     # Step 2 parameters
@@ -61,8 +58,7 @@ if __name__ == '__main__':
     reference_aligned.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Aligned', REFERENCE_IMAGE_NAME + '_aligned' + REFERENCE_IMAGE_EXT))
     
 
-    # style_target, style_latent = invert_image(reference_aligned, INVERT_GAN_PATH, reps=1)
-    style_target, style_latent = invert_image2(reference_aligned, INVERT_GAN_PATH)
+    style_target, style_latent = invert_image(reference_aligned, INVERT_GAN_PATH)
 
     style_target.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Inverted', REFERENCE_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_' + REFERENCE_IMAGE_EXT))
     np.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Inverted latents', REFERENCE_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_latent_code.npy'), style_latent)
@@ -80,7 +76,6 @@ if __name__ == '__main__':
     
     # Load the generator
     generator = Generator(1024, 512, 8, 2).to(device)
-    # stylegan_checkpoint = torch.load(os.path.join('..', 'Models', 'stylegan2_config.pt'))
     stylegan_checkpoint = torch.load(os.path.join('..', '..', 'Models', 'stylegan2-ffhq-config-f.pt'))
     generator.load_state_dict(stylegan_checkpoint['g_ema'], strict=False)
     
@@ -118,7 +113,6 @@ if __name__ == '__main__':
             real_features = discriminator(style_target)
         fake_features = discriminator(new_style_image)
         
-        
         loss = sum([F.l1_loss(x, y) for x, y in zip(fake_features, real_features)]) / len(real_features)
         
         generator_optimizer.zero_grad()
@@ -139,8 +133,7 @@ if __name__ == '__main__':
         input_aligned = Image.open(INPUT_IMAGE_PATH).resize((1024, 1024))   
         input_aligned.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Aligned', INPUT_IMAGE_NAME + '_aligned' + INPUT_IMAGE_EXT))
 
-    # input_target, input_latent = invert_image(input_aligned, INVERT_GAN_PATH, reps=5)
-    input_target, input_latent = invert_image2(input_aligned, INVERT_GAN_PATH)
+    input_target, input_latent = invert_image(input_aligned, INVERT_GAN_PATH)
     
     input_target.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Inverted', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_' + INPUT_IMAGE_EXT))
     np.save(os.path.join('..', '..', 'Images', 'JojoGAN', 'Inverted latents', INPUT_IMAGE_NAME + '_invert_' + INVERT_MODEL_NAME + '_latent_code.npy'), input_latent)
